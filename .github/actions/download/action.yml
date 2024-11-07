@@ -1,0 +1,22 @@
+name: download-artifact
+
+description: Download Artifact
+
+inputs:
+  platform:
+    description: Platform
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Env to output
+      shell: bash
+      run: |
+        PACKAGE_NAME=ffmpeg.${{ inputs.platform }}.tar.gz
+        echo "package_name=$PACKAGE_NAME" >> $GITHUB_ENV
+        echo "$PACKAGE_NAME/ffmpeg.${{ inputs.platform }}.tar.gz" >> package_paths.env
+    - uses: actions/download-artifact@v4
+      with:
+        name: ${{ env.package_name }}
+        path: ${{ env.package_name }}
