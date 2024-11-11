@@ -19,7 +19,7 @@ jobs:
         id: extract_version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-  build:
+  build-linux:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -33,10 +33,6 @@ jobs:
             arch: aarch64
             os: linux
             cross-prefix: aarch64-linux-gnu-
-          - name: windows-x86_64
-            arch: x86_64
-            os: mingw32
-            cross-prefix: x86_64-w64-mingw32-
     needs: set-version
     env:
       VERSION: ${{ needs.set-version.outputs.version }}
@@ -54,13 +50,10 @@ jobs:
           if [[ "${{ matrix.platform.name }}" == "linux-arm64" ]]; then
           sudo apt-get install -qq g++-aarch64-linux-gnu qemu-user
           fi
-          if [[ "${{ matrix.platform.name }}" == "windows-x86_64" ]]; then
-          sudo apt-get install -qq mingw-w64 gcc-mingw-w64
-          fi
 
       - name: Build FFmpeg
         run: |
-            ./configure --prefix=$(pwd)/build_output --cross-prefix="${{ matrix.platform.cross-prefix }}" --enable-cross-compile --target-os="${{ matrix.platform.os }}" --arch="${{ matrix.platform.arch }}" --extra-cflags="-DLIBTWOLAME_STATIC" --extra-ldflags="-pthread" --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-asm
+            ./configure --prefix=$(pwd)/build_output --cross-prefix="${{ matrix.platform.cross-prefix }}" --enable-cross-compile --target-os="${{ matrix.platform.os }}" --arch="${{ matrix.platform.arch }}" --extra-cflags="-DLIBTWOLAME_STATIC" --extra-ldflags="-pthread" --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
             make -j$(nproc)
             make install
 
@@ -81,6 +74,73 @@ jobs:
         with:
           name: ffmpeg.${{ matrix.platform.name }}.tar.gz
           path: ffmpeg.${{ matrix.platform.name }}.tar.gz
+
+  build-windows:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: windows-x86_64
+    needs: set-version
+    env:
+      VERSION: ${{ needs.set-version.outputs.version }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          ref: release/${{ env.VERSION }}
+
+      - name: Install MSYS2
+        uses: msys2/setup-msys2@v2
+
+      - name: Install dependencies
+        shell: msys2 {0}
+        run: |
+          pacman -S --noconfirm make
+          pacman -S --noconfirm diffutils
+          pacman -S --noconfirm pkg-config
+
+      - name: Build FFmpeg
+        shell: msys2 {0}
+        run: |
+          export PATH="/c/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.41.34120/bin/Hostx64/x64:$PATH"
+          export LIB="/c/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.41.34120/lib/x64:/c/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64:/c/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/ucrt/x64"
+          export INCLUDE="/c/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.41.34120/include:/c/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/ucrt:/c/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/um:/c/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared"
+          ./configure --prefix=$(pwd)/build_output --toolchain=msvc --target-os=win64 --arch=x86_64 --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
+          make -j$(nproc)
+          make install
+
+      - name: Check for crash logs
+        shell: bash
+        if: failure()
+        run: |
+          if test -f ffbuild/config.log; then
+            echo "Crash logs found:"
+            cat ffbuild/config.log
+          else
+            echo "No crash log found"
+          fi
+
+      - name: Prepare for artifact
+        run: |
+          mkdir artifacts/lib
+          mkdir artifacts/include
+          move build_output/lib/libavcodec.a artifacts/lib/avcodec.lib
+          move build_output/lib/libavformat.a artifacts/lib/avformat.lib
+          move build_output/lib/libavutil.a artifacts/lib/avutil.lib
+          move build_output/include/libavcodec artifacts/include/
+          move build_output/include/libavformat artifacts/include/
+          move build_output/include/libavutil artifacts/include/
+          Compress-Archive -Path artifacts -DestinationPath ffmpeg.${{ matrix.platform.name }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg.${{ matrix.platform.name }}.zip
+          path: ffmpeg.${{ matrix.platform.name }}.zip
+  
 
   build-macos:
     runs-on: macos-14
@@ -127,7 +187,8 @@ jobs:
     name: Create Release
     if: contains(github.ref, 'tags/v')
     needs:
-      - build
+      - build-linux
+      - build-windows
       - build-macos
     runs-on: ubuntu-latest
     steps:
