@@ -99,31 +99,14 @@ jobs:
         run: |
           pacman -S --noconfirm base-devel
 
-      - name: Build FFmpeg with MSVC
+      - name: Build FFmpeg
         shell: msys2 {0}
         run: | 
-          echo "running vcvars.sh from fftools"
           curl -L https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/master/vcvars.sh -o vcvars.sh
           source ./vcvars.sh
-          echo $PATH
           ./configure --prefix=$(pwd)/build_output --toolchain=msvc --target-os=win64 --arch=x86_64 --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
           make -j$(nproc)
           make install
-          echo built
-          ls build_output
-          ls build_output/lib
-          ls build_output/include
-
-      - name: Check for crash logs
-        shell: bash
-        if: failure()
-        run: |
-          if test -f ffbuild/config.log; then
-            echo "Crash logs found:"
-            cat ffbuild/config.log
-          else
-            echo "No crash log found"
-          fi
 
       - name: Prepare for artifact
         run: |
