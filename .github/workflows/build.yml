@@ -19,7 +19,7 @@ jobs:
         id: extract_version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-  build:
+  build-linux:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -33,15 +33,11 @@ jobs:
             arch: aarch64
             os: linux
             cross-prefix: aarch64-linux-gnu-
-          - name: windows-x86_64
-            arch: x86_64
-            os: mingw32
-            cross-prefix: x86_64-w64-mingw32-
     needs: set-version
     env:
       VERSION: ${{ needs.set-version.outputs.version }}
     steps:
-      - name: Check out the repo
+      - name: Check out FFmpeg
         uses: actions/checkout@v4
         with:
           repository: FFmpeg/FFmpeg
@@ -54,13 +50,10 @@ jobs:
           if [[ "${{ matrix.platform.name }}" == "linux-arm64" ]]; then
           sudo apt-get install -qq g++-aarch64-linux-gnu qemu-user
           fi
-          if [[ "${{ matrix.platform.name }}" == "windows-x86_64" ]]; then
-          sudo apt-get install -qq mingw-w64 gcc-mingw-w64
-          fi
 
       - name: Build FFmpeg
         run: |
-            ./configure --prefix=$(pwd)/build_output --cross-prefix="${{ matrix.platform.cross-prefix }}" --enable-cross-compile --target-os="${{ matrix.platform.os }}" --arch="${{ matrix.platform.arch }}" --extra-cflags="-DLIBTWOLAME_STATIC" --extra-ldflags="-pthread" --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-asm
+            ./configure --prefix=$(pwd)/build_output --cross-prefix="${{ matrix.platform.cross-prefix }}" --enable-cross-compile --target-os="${{ matrix.platform.os }}" --arch="${{ matrix.platform.arch }}" --extra-cflags="-DLIBTWOLAME_STATIC" --extra-ldflags="-pthread" --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
             make -j$(nproc)
             make install
 
@@ -82,6 +75,58 @@ jobs:
           name: ffmpeg.${{ matrix.platform.name }}.tar.gz
           path: ffmpeg.${{ matrix.platform.name }}.tar.gz
 
+  build-windows:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: windows-x86_64
+    needs: set-version
+    env:
+      VERSION: ${{ needs.set-version.outputs.version }}
+    steps:
+      - name: Check out FFmpeg
+        uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          ref: release/${{ env.VERSION }}
+
+      - uses: msys2/setup-msys2@v2
+
+      - name: Install dependencies
+        shell: msys2 {0}
+        run: |
+          pacman -S --noconfirm base-devel
+
+      - name: Build FFmpeg
+        shell: msys2 {0}
+        run: | 
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/master/vcvars.sh -o vcvars.sh
+          source ./vcvars.sh
+          ./configure --prefix=$(pwd)/build_output --toolchain=msvc --target-os=win64 --arch=x86_64 --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
+          make -j$(nproc)
+          make install
+
+      - name: Prepare for artifact
+        run: |
+          mkdir artifacts/lib
+          mkdir artifacts/include
+          move build_output/lib/libavcodec.a artifacts/lib/avcodec.lib
+          move build_output/lib/libavformat.a artifacts/lib/avformat.lib
+          move build_output/lib/libavutil.a artifacts/lib/avutil.lib
+          move build_output/include/libavcodec artifacts/include/
+          move build_output/include/libavformat artifacts/include/
+          move build_output/include/libavutil artifacts/include/
+          Compress-Archive -Path artifacts -DestinationPath ffmpeg.${{ matrix.platform.name }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg.${{ matrix.platform.name }}.zip
+          path: ffmpeg.${{ matrix.platform.name }}.zip
+  
+
   build-macos:
     runs-on: macos-14
     strategy:
@@ -93,7 +138,7 @@ jobs:
     env:
       VERSION: ${{ needs.set-version.outputs.version }}
     steps:
-      - name: Check out the repo
+      - name: Check out FFmpeg
         uses: actions/checkout@v4
         with:
           repository: FFmpeg/FFmpeg
@@ -127,7 +172,8 @@ jobs:
     name: Create Release
     if: contains(github.ref, 'tags/v')
     needs:
-      - build
+      - build-linux
+      - build-windows
       - build-macos
     runs-on: ubuntu-latest
     steps:
