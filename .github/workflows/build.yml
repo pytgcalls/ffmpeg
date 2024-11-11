@@ -37,7 +37,7 @@ jobs:
     env:
       VERSION: ${{ needs.set-version.outputs.version }}
     steps:
-      - name: Check out the repo
+      - name: Check out FFmpeg
         uses: actions/checkout@v4
         with:
           repository: FFmpeg/FFmpeg
@@ -86,31 +86,33 @@ jobs:
     env:
       VERSION: ${{ needs.set-version.outputs.version }}
     steps:
-      - name: Check out the repo
+      - name: Check out FFmpeg
         uses: actions/checkout@v4
         with:
           repository: FFmpeg/FFmpeg
           ref: release/${{ env.VERSION }}
 
-      - name: Install MSYS2
-        uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@v2
 
       - name: Install dependencies
         shell: msys2 {0}
         run: |
-          pacman -S --noconfirm make
-          pacman -S --noconfirm diffutils
-          pacman -S --noconfirm pkg-config
+          pacman -S --noconfirm base-devel
 
-      - name: Build FFmpeg
+      - name: Build FFmpeg with MSVC
         shell: msys2 {0}
-        run: |
-          export PATH="/c/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.41.34120/bin/Hostx64/x64:$PATH"
-          export LIB="/c/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.41.34120/lib/x64:/c/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64:/c/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/ucrt/x64"
-          export INCLUDE="/c/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.41.34120/include:/c/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/ucrt:/c/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/um:/c/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared"
+        run: | 
+          echo "running vcvars.sh from fftools"
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/master/vcvars.sh -o vcvars.sh
+          source ./vcvars.sh
+          echo $PATH
           ./configure --prefix=$(pwd)/build_output --toolchain=msvc --target-os=win64 --arch=x86_64 --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
           make -j$(nproc)
           make install
+          echo built
+          ls build_output
+          ls build_output/lib
+          ls build_output/include
 
       - name: Check for crash logs
         shell: bash
@@ -153,7 +155,7 @@ jobs:
     env:
       VERSION: ${{ needs.set-version.outputs.version }}
     steps:
-      - name: Check out the repo
+      - name: Check out FFmpeg
         uses: actions/checkout@v4
         with:
           repository: FFmpeg/FFmpeg
