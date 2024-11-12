@@ -20,19 +20,19 @@ jobs:
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform.host }}
     strategy:
       fail-fast: false
       matrix:
         platform:
           - name: linux-x86_64
             arch: x86_64
-            os: linux
-            cross-prefix: ""
+            arch_image: x86_64
+            host: ubuntu-latest
           - name: linux-arm64
             arch: aarch64
-            os: linux
-            cross-prefix: aarch64-linux-gnu-
+            arch_image: arm64
+            host: arm64-server
     needs: set-version
     env:
       VERSION: ${{ needs.set-version.outputs.version }}
@@ -43,19 +43,19 @@ jobs:
           repository: FFmpeg/FFmpeg
           ref: release/${{ env.VERSION }}
 
-      - name: Install dependencies
-        if: matrix.platform.name == 'linux-arm64' || matrix.platform.name == 'windows-x86_64'
-        run: |
-          sudo apt-get update -qq
-          if [[ "${{ matrix.platform.name }}" == "linux-arm64" ]]; then
-          sudo apt-get install -qq g++-aarch64-linux-gnu qemu-user
-          fi
+      - name: Set up QEMU
+        if: matrix.platform.name == 'linux-arm64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
-      - name: Build FFmpeg
+      - name: Build FFmpeg with Docker
         run: |
-            ./configure --prefix=$(pwd)/build_output --cross-prefix="${{ matrix.platform.cross-prefix }}" --enable-cross-compile --target-os="${{ matrix.platform.os }}" --arch="${{ matrix.platform.arch }}" --extra-cflags="-DLIBTWOLAME_STATIC" --extra-ldflags="-pthread" --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
-            make -j$(nproc)
-            make install
+          docker run -v $(pwd):/app -w /app ghcr.io/pytgcalls/ntgcalls/${{ matrix.platform.arch_image }}:latest bash -c "
+          ./configure --prefix=/app/build_output --target-os="linux" --arch="${{ matrix.platform.arch }}" --extra-cflags="-DLIBTWOLAME_STATIC" --extra-ldflags="-pthread" --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
+          make -j$(nproc)
+          make install
+          chown -R $(id -u):$(id -g) build_output"
 
       - name: Prepare for artifact
         run: |
