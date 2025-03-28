@@ -144,6 +144,10 @@ jobs:
           repository: FFmpeg/FFmpeg
           ref: release/${{ env.VERSION }}
 
+      - name: Set deployment target (only for macOS)
+        if: runner.os == 'macOS'
+        run: echo "MACOSX_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
+
       - name: Build FFmpeg
         run: |
             ./configure --prefix=$(pwd)/build_output --enable-cross-compile --target-os=darwin --arch=arm64 --extra-cflags="-DLIBTWOLAME_STATIC" --extra-ldflags="-pthread" --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-asm
