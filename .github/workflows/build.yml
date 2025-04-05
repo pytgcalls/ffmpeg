@@ -10,19 +10,9 @@ on:
       - "*"
 
 jobs:
-  set-version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.extract_version.outputs.VERSION }}
-    steps:
-      - name: Extract version from tag
-        id: extract_version
-        run: echo "version=n${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-  build-linux:
+  build:
     runs-on: ${{ matrix.platform.host }}
     strategy:
-      fail-fast: false
       matrix:
         platform:
           - name: linux-x86_64
@@ -33,15 +23,15 @@ jobs:
             arch: aarch64
             arch_image: arm64
             host: arm64-server
-    needs: set-version
-    env:
-      VERSION: ${{ needs.set-version.outputs.version }}
+          - name: macos-arm64
+            arch: arm64
+            host: macos-15
+          - name: windows-x86_64
+            arch: x86_64
+            host: windows-2022
     steps:
-      - name: Check out FFmpeg
+      - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          repository: FFmpeg/FFmpeg
-          ref: ${{ env.VERSION }}
 
       - name: Set up QEMU
         if: matrix.platform.name == 'linux-arm64'
@@ -49,136 +39,57 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Build FFmpeg with Docker
-        run: |
-          docker run -v $(pwd):/app -w /app ghcr.io/pytgcalls/ntgcalls/${{ matrix.platform.arch_image }}:latest bash -c "
-          ./configure --prefix=/app/build_output --target-os="linux" --arch="${{ matrix.platform.arch }}" --extra-cflags="-DLIBTWOLAME_STATIC" --extra-ldflags="-pthread" --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
-          make -j$(nproc)
-          make install
-          chown -R $(id -u):$(id -g) build_output"
+      - name: Setup MSYS2
+        if: matrix.platform.name == 'windows-x86_64'
+        uses: msys2/setup-msys2@v2
 
-      - name: Prepare for artifact
+      - name: Install dependencies
+        if: matrix.platform.name == 'windows-x86_64'
+        shell: msys2 {0}
+        run: pacman -S --noconfirm base-devel git
+
+      - name: Build FFmpeg (Linux)
+        if: matrix.platform.name == 'linux-x86_64' || matrix.platform.name == 'linux-arm64'
         run: |
-          mkdir -p artifacts/lib
-          mkdir -p artifacts/include
-          mv build_output/lib/libavcodec.a artifacts/lib/
-          mv build_output/lib/libavformat.a artifacts/lib/
-          mv build_output/lib/libavutil.a artifacts/lib/
-          mv build_output/include/libavcodec artifacts/include/
-          mv build_output/include/libavformat artifacts/include/
-          mv build_output/include/libavutil artifacts/include/
+          docker run -v $(pwd):/app -w /app ghcr.io/pytgcalls/ntgcalls/${{ matrix.platform.arch_image }}:latest bash build.sh --arch=${{ matrix.platform.arch }}
+
+      - name: Build FFmpeg (Windows)
+        if: matrix.platform.name == 'windows-x86_64'
+        shell: msys2 {0}
+        run: bash build.sh --arch=${{ matrix.platform.arch }}
+
+      - name: Build FFmpeg (macOS)
+        if: matrix.platform.name == 'macos-arm64'
+        run: bash build.sh --arch=${{ matrix.platform.arch }}
+
+      - name: Prepare for artifact (Linux and macOS)
+        if: matrix.platform.name != 'windows-x86_64'
+        run: |
           tar -czvf ffmpeg.${{ matrix.platform.name }}.tar.gz artifacts
 
-      - name: Upload artifact
+      - name: Prepare for artifact (Windows)
+        if: matrix.platform.name == 'windows-x86_64'
+        run: |
+          Compress-Archive -Path artifacts -DestinationPath ffmpeg.${{ matrix.platform.name }}.zip
+
+      - name: Upload artifact (Linux and macOS)
         uses: actions/upload-artifact@v4
+        if: matrix.platform.name != 'windows-x86_64'
         with:
           name: ffmpeg.${{ matrix.platform.name }}.tar.gz
           path: ffmpeg.${{ matrix.platform.name }}.tar.gz
 
-  build-windows:
-    runs-on: windows-2022
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - name: windows-x86_64
-    needs: set-version
-    env:
-      VERSION: ${{ needs.set-version.outputs.version }}
-    steps:
-      - name: Check out FFmpeg
-        uses: actions/checkout@v4
-        with:
-          repository: FFmpeg/FFmpeg
-          ref: ${{ env.VERSION }}
-
-      - uses: msys2/setup-msys2@v2
-
-      - name: Install dependencies
-        shell: msys2 {0}
-        run: |
-          pacman -S --noconfirm base-devel
-
-      - name: Build FFmpeg
-        shell: msys2 {0}
-        run: | 
-          curl -L https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/master/vcvars.sh -o vcvars.sh
-          source ./vcvars.sh
-          ./configure --prefix=$(pwd)/build_output --toolchain=msvc --target-os=win64 --arch=x86_64 --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-dxva2 --disable-asm
-          make -j$(nproc)
-          make install
-
-      - name: Prepare for artifact
-        run: |
-          mkdir artifacts/lib
-          mkdir artifacts/include
-          move build_output/lib/libavcodec.a artifacts/lib/avcodec.lib
-          move build_output/lib/libavformat.a artifacts/lib/avformat.lib
-          move build_output/lib/libavutil.a artifacts/lib/avutil.lib
-          move build_output/include/libavcodec artifacts/include/
-          move build_output/include/libavformat artifacts/include/
-          move build_output/include/libavutil artifacts/include/
-          Compress-Archive -Path artifacts -DestinationPath ffmpeg.${{ matrix.platform.name }}.zip
-
-      - name: Upload artifact
+      - name: Upload artifact (Windows)
         uses: actions/upload-artifact@v4
+        if: matrix.platform.name == 'windows-x86_64'
         with:
           name: ffmpeg.${{ matrix.platform.name }}.zip
           path: ffmpeg.${{ matrix.platform.name }}.zip
-  
-
-  build-macos:
-    runs-on: macos-14
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - name: macos-arm64
-    needs: set-version
-    env:
-      VERSION: ${{ needs.set-version.outputs.version }}
-    steps:
-      - name: Check out FFmpeg
-        uses: actions/checkout@v4
-        with:
-          repository: FFmpeg/FFmpeg
-          ref: ${{ env.VERSION }}
-
-      - name: Set deployment target (only for macOS)
-        if: runner.os == 'macOS'
-        run: echo "MACOSX_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
-
-      - name: Build FFmpeg
-        run: |
-            ./configure --prefix=$(pwd)/build_output --enable-cross-compile --target-os=darwin --arch=arm64 --extra-cflags="-DLIBTWOLAME_STATIC" --extra-ldflags="-pthread" --disable-programs --disable-doc --disable-network --disable-everything --enable-protocol=file --enable-decoder=h264 --enable-parser=h264 --enable-demuxer=h264 --enable-muxer=mp4 --enable-pic --disable-asm
-            make -j$(sysctl -n hw.logicalcpu)
-            make install
-
-      - name: Prepare for artifact
-        run: |
-          mkdir -p artifacts/lib
-          mkdir -p artifacts/include
-          mv build_output/lib/libavcodec.a artifacts/lib/
-          mv build_output/lib/libavformat.a artifacts/lib/
-          mv build_output/lib/libavutil.a artifacts/lib/
-          mv build_output/include/libavcodec artifacts/include/
-          mv build_output/include/libavformat artifacts/include/
-          mv build_output/include/libavutil artifacts/include/
-          tar -czvf ffmpeg.macos-arm64.tar.gz artifacts
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ffmpeg.${{ matrix.platform.name }}.tar.gz
-          path: ffmpeg.${{ matrix.platform.name }}.tar.gz
 
   create-release:
     name: Create Release
     if: contains(github.ref, 'tags/v')
-    needs:
-      - build-linux
-      - build-windows
-      - build-macos
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
