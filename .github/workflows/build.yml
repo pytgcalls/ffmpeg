@@ -16,18 +16,16 @@ jobs:
       matrix:
         platform:
           - name: linux-x86_64
-            arch: x86_64
             arch_image: x86_64
             host: ubuntu-latest
           - name: linux-arm64
-            arch: aarch64
             arch_image: arm64
             host: arm64-server
+          - name: android
+            host: ubuntu-latest
           - name: macos-arm64
-            arch: arm64
             host: macos-15
           - name: windows-x86_64
-            arch: x86_64
             host: windows-2022
     steps:
       - name: Check out repository
@@ -43,26 +41,52 @@ jobs:
         if: matrix.platform.name == 'windows-x86_64'
         uses: msys2/setup-msys2@v2
 
-      - name: Install dependencies
+      - name: Detect Native CMake Path (Windows)
+        id: detect_cmake
+        if: matrix.platform.name == 'windows-x86_64'
+        shell: powershell
+        run: |
+          $cmake = (Get-Command cmake).Source
+          echo "cmake_path=$cmake" >> $env:GITHUB_ENV
+
+      - name: Install dependencies (Windows)
         if: matrix.platform.name == 'windows-x86_64'
         shell: msys2 {0}
-        run: pacman -S --noconfirm base-devel git
+        run: pacman -S --noconfirm base-devel git python autotools
+
+      - name: Install dependencies (macOS)
+        if: matrix.platform.name == 'macos-arm64'
+        run: |
+          brew install autoconf automake libtool
 
       - name: Build FFmpeg (Linux)
         if: matrix.platform.name == 'linux-x86_64' || matrix.platform.name == 'linux-arm64'
         run: |
-          docker run -v $(pwd):/app -w /app ghcr.io/pytgcalls/ntgcalls/${{ matrix.platform.arch_image }}:latest bash build.sh --arch=${{ matrix.platform.arch }}
+          docker run -v $(pwd):/app -w /app --env GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+              ghcr.io/pytgcalls/ntgcalls/${{ matrix.platform.arch_image }}:latest bash build.sh
+
+      - name: Build FFmpeg (Android)
+        if: matrix.platform.name == 'android'
+        run: bash build.sh --platform="android"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build FFmpeg (Windows)
         if: matrix.platform.name == 'windows-x86_64'
         shell: msys2 {0}
-        run: bash build.sh --arch=${{ matrix.platform.arch }}
+        run: |
+          export PATH="$(dirname "$(cygpath -u "$cmake_path")"):$PATH"
+          bash build.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build FFmpeg (macOS)
         if: matrix.platform.name == 'macos-arm64'
-        run: bash build.sh --arch=${{ matrix.platform.arch }}
+        run: bash build.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare for artifact (Linux and macOS)
+      - name: Prepare for artifact (Linux, macOS and Android)
         if: matrix.platform.name != 'windows-x86_64'
         run: |
           tar -czvf ffmpeg.${{ matrix.platform.name }}.tar.gz artifacts
@@ -72,7 +96,7 @@ jobs:
         run: |
           Compress-Archive -Path artifacts -DestinationPath ffmpeg.${{ matrix.platform.name }}.zip
 
-      - name: Upload artifact (Linux and macOS)
+      - name: Upload artifact (Linux, macOS and Android)
         uses: actions/upload-artifact@v4
         if: matrix.platform.name != 'windows-x86_64'
         with:
@@ -105,6 +129,9 @@ jobs:
       - uses: ./.github/actions/download
         with:
           platform: macos-arm64
+      - uses: ./.github/actions/download
+        with:
+          platform: android
       - name: Env to output
         run: |
           echo "package_paths<<EOF" >> $GITHUB_OUTPUT
