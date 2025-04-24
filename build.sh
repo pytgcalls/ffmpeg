@@ -85,7 +85,10 @@ for arch in "${arch_builds[@]}"; do
     --linux-macos="--extra-ldflags=-pthread" \
     --linux-macos-android="--extra-cflags='-fvisibility=hidden -ffunction-sections -fdata-sections -g -fno-omit-frame-pointer -O2 -DCONFIG_LINUX_PERF=0'" \
     --disable-programs --disable-doc \
-    --disable-network --disable-everything --enable-protocol=file \
+    --disable-network --disable-everything \
+    --enable-runtime-cpudetect --enable-protocol=file \
+    --enable-hwaccels --disable-dxva2 \
+    --disable-asm \
     --enable-libopus \
     --enable-decoder=h264 \
     --enable-decoder=mp3 \
@@ -162,8 +165,7 @@ for arch in "${arch_builds[@]}"; do
     --enable-parser=mpegaudio \
     --enable-parser=mpeg4video \
     --enable-parser=mpegaudio \
-    --enable-parser=opus \
-    --disable-dxva2 --disable-asm
+    --enable-parser=opus
 
   if is_linux; then
     if [[ "$(uname -m)" == "x86_64" ]]; then
