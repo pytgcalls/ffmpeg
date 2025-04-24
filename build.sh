@@ -73,7 +73,8 @@ for arch in "${arch_builds[@]}"; do
         --sysroot=$(android_tool sysroot) \
         --arch=$(normalize_arch "$arch") \
         --cpu=$(normalize_arch "$arch" "cpu") \
-        --extra-ldflags='$(android_tool builtins "$arch") -nostdlib -lc -lm -ldl'" \
+        --extra-ldflags='$(android_tool builtins "$arch") -nostdlib -lc -lm -ldl -pthread' \
+        --disable-zlib" \
     --linux-windows="--enable-ffnvcodec \
         --enable-nvdec \
         --enable-cuvid \
