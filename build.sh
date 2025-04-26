@@ -55,13 +55,15 @@ for arch in "${arch_builds[@]}"; do
         --enable-hwaccel=mpeg2_vaapi \
         --enable-hwaccel=mpeg2_vdpau \
         --enable-hwaccel=mpeg4_vaapi \
-        --enable-hwaccel=mpeg4_vdpau" \
+        --enable-hwaccel=mpeg4_vdpau \
+        --extra-ldflags=-pthread" \
     --windows="--target-os=win64 \
         --toolchain=msvc" \
     --macos="--target-os=darwin \
         --enable-videotoolbox \
         --enable-hwaccel=h264_videotoolbox \
-        --enable-hwaccel=hevc_videotoolbox" \
+        --enable-hwaccel=hevc_videotoolbox \
+        --extra-ldflags='-pthread -lbz2 -lz'" \
     --android="--target-os=android \
         --enable-cross-compile \
         --cc=$(android_tool cc "$arch") \
@@ -82,8 +84,7 @@ for arch in "${arch_builds[@]}"; do
         --enable-hwaccel=hevc_nvdec \
         --enable-hwaccel=mpeg2_nvdec \
         --enable-hwaccel=mpeg4_nvdec" \
-    --linux-macos="--extra-ldflags=-pthread" \
-    --linux-macos-android="--extra-cflags='-fvisibility=hidden -ffunction-sections -fdata-sections -g -fno-omit-frame-pointer -O2 -DCONFIG_LINUX_PERF=0'" \
+    --linux-macos-android="--extra-cflags='-fvisibility=hidden -ffunction-sections -fdata-sections $(if is_macos; then echo -fno-common; fi) -g -fno-omit-frame-pointer -O2 -DCONFIG_LINUX_PERF=0'" \
     --disable-programs --disable-doc \
     --disable-network --disable-everything \
     --enable-runtime-cpudetect --enable-protocol=file \
