@@ -149,6 +149,9 @@ for arch in "${arch_builds[@]}"; do
     --enable-decoder=wmav1 \
     --enable-decoder=wmav2 \
     --enable-decoder=wmavoice \
+    --enable-decoder=aac \
+    --enable-decoder=aac_fixed \
+    --enable-decoder=aac_latm \
     --enable-encoder=libopus \
     --enable-demuxer=h264 \
     --enable-demuxer=hevc \
@@ -158,6 +161,7 @@ for arch in "${arch_builds[@]}"; do
     --enable-demuxer=mp3 \
     --enable-demuxer=ogg \
     --enable-demuxer=wav \
+    --enable-demuxer=aac \
     --enable-muxer=ogg \
     --enable-muxer=opus \
     --enable-muxer=mp4 \
@@ -166,7 +170,9 @@ for arch in "${arch_builds[@]}"; do
     --enable-parser=mpegaudio \
     --enable-parser=mpeg4video \
     --enable-parser=mpegaudio \
-    --enable-parser=opus
+    --enable-parser=opus \
+    --enable-parser=aac \
+    --enable-parser=aac_latm
 
   if is_linux; then
     if [[ "$(uname -m)" == "x86_64" ]]; then
