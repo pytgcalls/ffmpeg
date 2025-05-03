@@ -52,7 +52,7 @@ jobs:
       - name: Install dependencies (Windows)
         if: matrix.platform.name == 'windows-x86_64'
         shell: msys2 {0}
-        run: pacman -S --noconfirm base-devel git python autotools
+        run: pacman -S --noconfirm base-devel git python autotools nasm
 
       - name: Install dependencies (macOS)
         if: matrix.platform.name == 'macos-arm64'
