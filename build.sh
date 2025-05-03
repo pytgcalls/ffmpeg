@@ -89,7 +89,6 @@ for arch in "${arch_builds[@]}"; do
     --disable-network --disable-everything \
     --enable-runtime-cpudetect --enable-protocol=file \
     --enable-hwaccels --disable-dxva2 \
-    --disable-asm \
     --enable-libopus \
     --enable-decoder=h264 \
     --enable-decoder=mp3 \
