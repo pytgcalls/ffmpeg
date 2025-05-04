@@ -144,7 +144,6 @@ for arch in "${arch_builds[@]}"; do
     --enable-decoder=pcm_u32be \
     --enable-decoder=pcm_u32le \
     --enable-decoder=pcm_u8 \
-    --enable-decoder=pcm_zork \
     --enable-decoder=wavpack \
     --enable-decoder=wmalossless \
     --enable-decoder=wmapro \
