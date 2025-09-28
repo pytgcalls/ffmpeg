@@ -17,10 +17,16 @@ jobs:
         platform:
           - name: linux-x86_64
             arch_image: x86_64
+            gcc_suffix: manylinux
             host: ubuntu-latest
           - name: linux-arm64
             arch_image: arm64
+            gcc_suffix: manylinux
             host: arm64-server
+          - name: muslinux-x86_64
+            arch_image: x86_64
+            gcc_suffix: muslinux
+            host: ubuntu-latest
           - name: android
             host: ubuntu-latest
           - name: macos-arm64
@@ -60,10 +66,10 @@ jobs:
           brew install autoconf automake libtool
 
       - name: Build FFmpeg (Linux)
-        if: matrix.platform.name == 'linux-x86_64' || matrix.platform.name == 'linux-arm64'
+        if: matrix.platform.name == 'linux-x86_64' || matrix.platform.name == 'linux-arm64' || matrix.platform.name == 'muslinux-x86_64'
         run: |
           docker run -v $(pwd):/app -w /app --env GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
-              ghcr.io/pytgcalls/ntgcalls/${{ matrix.platform.arch_image }}:latest bash build.sh
+              ghcr.io/pytgcalls/ntgcalls/${{ matrix.platform.gcc_suffix }}-${{ matrix.platform.arch_image }}:latest bash build.sh
 
       - name: Build FFmpeg (Android)
         if: matrix.platform.name == 'android'
@@ -126,6 +132,9 @@ jobs:
       - uses: ./.github/actions/download
         with:
           platform: linux-arm64
+      - uses: ./.github/actions/download
+        with:
+          platform: muslinux-x86_64
       - uses: ./.github/actions/download
         with:
           platform: macos-arm64
