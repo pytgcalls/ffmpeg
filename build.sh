@@ -176,13 +176,8 @@ for arch in "${arch_builds[@]}"; do
     --enable-parser=aac_latm
 
   if is_linux; then
-    if [[ "$(uname -m)" == "x86_64" ]]; then
-      convert_to_static "libva" "libva" "libva-drm" "libva-x11" --compiler="clang"
-      copy_libs "libva" "artifacts" "libva" "libva-drm" "libva-x11"
-    else
-      convert_to_static "libva" "libva" "libva-drm" --compiler="clang"
-      copy_libs "libva" "artifacts" "libva" "libva-drm"
-    fi
+    convert_to_static "libva" "libva" "libva-drm" --compiler="clang"
+    copy_libs "libva" "artifacts" "libva" "libva-drm"
     convert_to_static "libvdpau" --compiler="clang"
     copy_libs "libvdpau" "artifacts"
   fi
