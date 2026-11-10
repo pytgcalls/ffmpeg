@@ -22,11 +22,15 @@ jobs:
           - name: linux-arm64
             arch_image: arm64
             gcc_suffix: manylinux
-            host: arm64-server
+            host: ubuntu-24.04-arm
           - name: muslinux-x86_64
             arch_image: x86_64
             gcc_suffix: muslinux
             host: ubuntu-latest
+          - name: muslinux-arm64
+            arch_image: arm64
+            gcc_suffix: muslinux
+            host: ubuntu-24.04-arm
           - name: android
             host: ubuntu-latest
           - name: macos-arm64
@@ -36,12 +40,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
-      - name: Set up QEMU
-        if: matrix.platform.name == 'linux-arm64'
-        uses: docker/setup-qemu-action@v4
-        with:
-          platforms: arm64
 
       - name: Setup MSYS2
         if: matrix.platform.name == 'windows-x86_64'
@@ -66,7 +64,7 @@ jobs:
           brew install autoconf automake libtool
 
       - name: Build FFmpeg (Linux)
-        if: matrix.platform.name == 'linux-x86_64' || matrix.platform.name == 'linux-arm64' || matrix.platform.name == 'muslinux-x86_64'
+        if: matrix.platform.name == 'linux-x86_64' || matrix.platform.name == 'linux-arm64' || matrix.platform.name == 'muslinux-x86_64' || matrix.platform.name == 'muslinux-arm64'
         run: |
           docker run --rm -v $(pwd):/app -w /app --env GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
               ghcr.io/pytgcalls/ntgcalls/${{ matrix.platform.gcc_suffix }}-${{ matrix.platform.arch_image }}:latest bash build.sh
@@ -135,6 +133,9 @@ jobs:
       - uses: ./.github/actions/download
         with:
           platform: muslinux-x86_64
+      - uses: ./.github/actions/download
+        with:
+          platform: muslinux-arm64
       - uses: ./.github/actions/download
         with:
           platform: macos-arm64
