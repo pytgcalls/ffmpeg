@@ -14,7 +14,7 @@ import ninja from python3
 sysroot_dir="$BUILD_KIT_DIR/usr"
 
 if is_linux; then
-  build_and_install "libva" meson --prefix="$sysroot_dir"
+  build_and_install "libva" meson --prefix="$sysroot_dir" -Dwith_x11=no -Dwith_glx=no -Dwith_wayland=no
   build_and_install "libvdpau" meson --prefix="$sysroot_dir"
 fi
 
@@ -56,6 +56,8 @@ for arch in "${arch_builds[@]}"; do
         --enable-hwaccel=mpeg2_vdpau \
         --enable-hwaccel=mpeg4_vaapi \
         --enable-hwaccel=mpeg4_vdpau \
+        --disable-xlib \
+        --disable-bzlib \
         --extra-ldflags=-pthread" \
     --windows="--target-os=win64 \
         --toolchain=msvc" \
