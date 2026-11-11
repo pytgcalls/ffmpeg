@@ -12,24 +12,22 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.platform.host }}
+    container:
+      image: ${{ matrix.platform.container }}
     strategy:
       matrix:
         platform:
           - name: linux-x86_64
-            arch_image: x86_64
-            gcc_suffix: manylinux
+            container: ghcr.io/pytgcalls/ntgcalls/manylinux-x86_64:latest
             host: ubuntu-latest
           - name: linux-arm64
-            arch_image: arm64
-            gcc_suffix: manylinux
+            container: ghcr.io/pytgcalls/ntgcalls/manylinux-arm64:latest
             host: ubuntu-24.04-arm
           - name: muslinux-x86_64
-            arch_image: x86_64
-            gcc_suffix: muslinux
+            container: ghcr.io/pytgcalls/ntgcalls/muslinux-x86_64:latest
             host: ubuntu-latest
           - name: muslinux-arm64
-            arch_image: arm64
-            gcc_suffix: muslinux
+            container: ghcr.io/pytgcalls/ntgcalls/muslinux-arm64:latest
             host: ubuntu-24.04-arm
           - name: android
             host: ubuntu-latest
@@ -64,10 +62,10 @@ jobs:
           brew install autoconf automake libtool
 
       - name: Build FFmpeg (Linux)
-        if: matrix.platform.name == 'linux-x86_64' || matrix.platform.name == 'linux-arm64' || matrix.platform.name == 'muslinux-x86_64' || matrix.platform.name == 'muslinux-arm64'
-        run: |
-          docker run --rm -v $(pwd):/app -w /app --env GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
-              ghcr.io/pytgcalls/ntgcalls/${{ matrix.platform.gcc_suffix }}-${{ matrix.platform.arch_image }}:latest bash build.sh
+        if: matrix.platform.container
+        run: bash build.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build FFmpeg (Android)
         if: matrix.platform.name == 'android'
