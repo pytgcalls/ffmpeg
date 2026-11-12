@@ -42,6 +42,8 @@ jobs:
       - name: Setup MSYS2
         if: matrix.platform.name == 'windows-x86_64'
         uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
 
       - name: Detect Native CMake Path (Windows)
         id: detect_cmake
